@@ -400,8 +400,7 @@ bool AJanggiBoard::MoveSelectedPieceToTile(AJanggiTile* TargetTile)
 	AJanggiPieceBase* CapturedPiece = TargetTile->CurrentPiece.Get();
 	if (CapturedPiece && CapturedPiece->Team == MovingPiece->Team)
 	{
-		SelectPiece(CapturedPiece);
-		UE_LOG(LogTemp, Log, TEXT("Janggi move failed: Reason=SameTeamPiece Piece=%s TargetPiece=%s Target=(%d,%d). Selection changed."),
+		UE_LOG(LogTemp, Log, TEXT("Janggi move failed: Reason=SameTeamPiece Piece=%s TargetPiece=%s Target=(%d,%d). Drag will return to origin."),
 			*GetNameSafe(MovingPiece),
 			*GetNameSafe(CapturedPiece),
 			CapturedPiece->BoardX,
@@ -526,6 +525,8 @@ bool AJanggiBoard::FinishDragOnTile(AJanggiTile* TargetTile)
 	if (!bMoved && DragSourceTile && DraggedPiece)
 	{
 		DraggedPiece->MoveToWorldLocation(BoardToWorld(DraggedPiece->BoardX, DraggedPiece->BoardY) + FVector(0.0f, 0.0f, PieceWorldZOffset));
+		ClearHighlights();
+		SelectedPiece = nullptr;
 		bIsDraggingPiece = false;
 		DraggedPiece = nullptr;
 		DragSourceTile = nullptr;
@@ -544,6 +545,8 @@ void AJanggiBoard::CancelDrag()
 	DraggedPiece->MoveToWorldLocation(BoardToWorld(DraggedPiece->BoardX, DraggedPiece->BoardY) + FVector(0.0f, 0.0f, PieceWorldZOffset));
 	UE_LOG(LogTemp, Log, TEXT("Janggi drag canceled: %s returned to (%d, %d)."), *GetNameSafe(DraggedPiece), DraggedPiece->BoardX, DraggedPiece->BoardY);
 
+	ClearHighlights();
+	SelectedPiece = nullptr;
 	bIsDraggingPiece = false;
 	DraggedPiece = nullptr;
 	DragSourceTile = nullptr;

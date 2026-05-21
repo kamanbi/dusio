@@ -42,6 +42,10 @@ AJanggiPlayerController::AJanggiPlayerController()
 	DirectionalLightOffsetTilesX = -2.0f;
 	CachedBoard = nullptr;
 	SpawnedCamera = nullptr;
+	DraggedPiece = nullptr;
+	OriginalTile = nullptr;
+	OriginalWorldLocation = FVector::ZeroVector;
+	bIsDraggingPiece = false;
 	bIsTouchDragging = false;
 	ActiveTouchFinger = ETouchIndex::Touch1;
 	LastTouchScreenPosition = FVector::ZeroVector;
@@ -83,7 +87,7 @@ void AJanggiPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
 
-	if (!bIsTouchDragging)
+	if (bIsDraggingPiece && !bIsTouchDragging)
 	{
 		UpdateMouseDragPreview();
 	}
@@ -109,13 +113,12 @@ void AJanggiPlayerController::HandlePrimaryPressed()
 		return;
 	}
 
-	HandleDragStartActor(HitActor);
+	BeginDragFromActor(HitActor, TEXT("Mouse"));
 }
 
 void AJanggiPlayerController::HandlePrimaryReleased()
 {
-	AJanggiBoard* Board = FindJanggiBoard();
-	if (!Board || !Board->IsDraggingPiece())
+	if (!bIsDraggingPiece)
 	{
 		return;
 	}
@@ -123,11 +126,11 @@ void AJanggiPlayerController::HandlePrimaryReleased()
 	AActor* HitActor = nullptr;
 	if (!TraceActorUnderCursor(HitActor))
 	{
-		Board->CancelDrag();
+		CancelActiveDrag(TEXT("Mouse"), TEXT("NoHitOnRelease"));
 		return;
 	}
 
-	FinishDragAtActor(HitActor);
+	FinishDragAtActor(HitActor, TEXT("Mouse"));
 }
 
 void AJanggiPlayerController::HandleTouchPressed(ETouchIndex::Type FingerIndex, FVector Location)
@@ -138,10 +141,12 @@ void AJanggiPlayerController::HandleTouchPressed(ETouchIndex::Type FingerIndex, 
 		return;
 	}
 
-	ActiveTouchFinger = FingerIndex;
-	LastTouchScreenPosition = Location;
-	bIsTouchDragging = true;
-	HandleDragStartActor(HitActor);
+	if (BeginDragFromActor(HitActor, TEXT("Touch")))
+	{
+		ActiveTouchFinger = FingerIndex;
+		LastTouchScreenPosition = Location;
+		bIsTouchDragging = true;
+	}
 }
 
 void AJanggiPlayerController::HandleTouchMoved(ETouchIndex::Type FingerIndex, FVector Location)
@@ -165,8 +170,7 @@ void AJanggiPlayerController::HandleTouchReleased(ETouchIndex::Type FingerIndex,
 	bIsTouchDragging = false;
 	LastTouchScreenPosition = Location;
 
-	AJanggiBoard* Board = FindJanggiBoard();
-	if (!Board || !Board->IsDraggingPiece())
+	if (!bIsDraggingPiece)
 	{
 		return;
 	}
@@ -174,72 +178,163 @@ void AJanggiPlayerController::HandleTouchReleased(ETouchIndex::Type FingerIndex,
 	AActor* HitActor = nullptr;
 	if (!TraceActorAtScreenPosition(Location.X, Location.Y, HitActor))
 	{
-		Board->CancelDrag();
+		CancelActiveDrag(TEXT("Touch"), TEXT("NoHitOnRelease"));
 		return;
 	}
 
-	FinishDragAtActor(HitActor);
+	FinishDragAtActor(HitActor, TEXT("Touch"));
 }
 
-void AJanggiPlayerController::HandleDragStartActor(AActor* HitActor)
+bool AJanggiPlayerController::BeginDragFromActor(AActor* HitActor, const TCHAR* InputType)
 {
 	if (!HitActor)
 	{
-		return;
+		UE_LOG(LogTemp, Warning, TEXT("Janggi drag start ignored: Input=%s Reason=NoHitActor."), InputType);
+		return false;
 	}
 
 	AJanggiBoard* Board = FindJanggiBoard();
 	if (!Board)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Janggi click ignored: no JanggiBoard found."));
-		return;
+		UE_LOG(LogTemp, Warning, TEXT("Janggi drag start ignored: Input=%s Reason=NoBoard."), InputType);
+		return false;
+	}
+
+	if (bIsDraggingPiece)
+	{
+		CancelActiveDrag(InputType, TEXT("RestartDrag"));
 	}
 
 	if (AJanggiPieceBase* Piece = Cast<AJanggiPieceBase>(HitActor))
 	{
-		UE_LOG(LogTemp, Log, TEXT("Janggi click target: PieceDragStart Piece=%s Team=%s Coord=(%d,%d)."),
+		UE_LOG(LogTemp, Log, TEXT("Janggi drag start target: Input=%s Actor=%s Type=Piece Team=%s Coord=(%d,%d)."),
+			InputType,
 			*GetNameSafe(Piece),
 			Piece->Team == EJanggiTeam::Red ? TEXT("Red") : TEXT("Blue"),
 			Piece->BoardX,
 			Piece->BoardY);
-		Board->BeginDragPiece(Piece);
-		return;
+
+		if (!Board->BeginDragPiece(Piece))
+		{
+			ClearLocalDragState();
+			UE_LOG(LogTemp, Warning, TEXT("Janggi drag start failed: Input=%s Piece=%s Reason=BoardRejected."),
+				InputType,
+				*GetNameSafe(Piece));
+			return false;
+		}
+
+		bIsDraggingPiece = true;
+		DraggedPiece = Piece;
+		OriginalTile = Board->GetTileAt(Piece->BoardX, Piece->BoardY);
+		OriginalWorldLocation = Piece->GetActorLocation();
+
+		UE_LOG(LogTemp, Log, TEXT("Janggi drag started in controller: Input=%s Piece=%s OriginalTile=(%d,%d) OriginalWorld=%s."),
+			InputType,
+			*GetNameSafe(Piece),
+			OriginalTile ? OriginalTile->TileX : -1,
+			OriginalTile ? OriginalTile->TileY : -1,
+			*OriginalWorldLocation.ToCompactString());
+		return true;
 	}
 
 	if (AJanggiTile* Tile = Cast<AJanggiTile>(HitActor))
 	{
-		UE_LOG(LogTemp, Log, TEXT("Janggi click target: TileNoMove Tile=(%d,%d) SelectedPiece=%s Reason=DragRequiresPiecePress."),
+		UE_LOG(LogTemp, Log, TEXT("Janggi drag start ignored: Input=%s Actor=%s Type=Tile Tile=(%d,%d) Reason=DragRequiresPiecePress."),
+			InputType,
+			*GetNameSafe(Tile),
 			Tile->TileX,
-			Tile->TileY,
-			Board->SelectedPiece ? *GetNameSafe(Board->SelectedPiece.Get()) : TEXT("None"));
-		Board->OnTileClicked(Tile);
-		return;
+			Tile->TileY);
+		return false;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Janggi click ignored: unsupported actor %s."), *GetNameSafe(HitActor));
+	UE_LOG(LogTemp, Warning, TEXT("Janggi drag start ignored: Input=%s Actor=%s Type=Other Reason=UnsupportedActor."),
+		InputType,
+		*GetNameSafe(HitActor));
+	return false;
 }
 
-void AJanggiPlayerController::FinishDragAtActor(AActor* HitActor)
+void AJanggiPlayerController::FinishDragAtActor(AActor* HitActor, const TCHAR* InputType)
 {
 	AJanggiBoard* Board = FindJanggiBoard();
-	if (!Board || !Board->IsDraggingPiece())
+	if (!Board || !bIsDraggingPiece || !Board->IsDraggingPiece())
 	{
+		CancelActiveDrag(InputType, TEXT("NoActiveDrag"));
 		return;
 	}
 
+	AJanggiTile* TargetTile = nullptr;
+	const TCHAR* TargetType = TEXT("Other");
 	if (AJanggiPieceBase* Piece = Cast<AJanggiPieceBase>(HitActor))
 	{
-		Board->FinishDragOnTile(Board->GetTileAt(Piece->BoardX, Piece->BoardY));
-		return;
+		TargetTile = Board->GetTileAt(Piece->BoardX, Piece->BoardY);
+		TargetType = TEXT("Piece");
 	}
-
-	if (AJanggiTile* Tile = Cast<AJanggiTile>(HitActor))
+	else if (AJanggiTile* Tile = Cast<AJanggiTile>(HitActor))
 	{
-		Board->FinishDragOnTile(Tile);
+		TargetTile = Tile;
+		TargetType = TEXT("Tile");
+	}
+
+	if (!TargetTile)
+	{
+		CancelActiveDrag(InputType, TEXT("NoTileFound"));
 		return;
 	}
 
-	Board->CancelDrag();
+	UE_LOG(LogTemp, Log, TEXT("Janggi drag release: Input=%s HitActor=%s TargetType=%s TargetTile=(%d,%d) DraggedPiece=%s OriginalTile=(%d,%d)."),
+		InputType,
+		*GetNameSafe(HitActor),
+		TargetType,
+		TargetTile->TileX,
+		TargetTile->TileY,
+		*GetNameSafe(DraggedPiece.Get()),
+		OriginalTile ? OriginalTile->TileX : -1,
+		OriginalTile ? OriginalTile->TileY : -1);
+
+	const bool bMoved = Board->FinishDragOnTile(TargetTile);
+	if (!bMoved && DraggedPiece)
+	{
+		DraggedPiece->MoveToWorldLocation(OriginalWorldLocation);
+		UE_LOG(LogTemp, Log, TEXT("Janggi drag restored original location: Input=%s Piece=%s World=%s."),
+			InputType,
+			*GetNameSafe(DraggedPiece.Get()),
+			*OriginalWorldLocation.ToCompactString());
+	}
+
+	ClearLocalDragState();
+}
+
+void AJanggiPlayerController::CancelActiveDrag(const TCHAR* InputType, const TCHAR* Reason)
+{
+	AJanggiBoard* Board = FindJanggiBoard();
+	if (Board)
+	{
+		Board->CancelDrag();
+	}
+
+	if (DraggedPiece)
+	{
+		DraggedPiece->MoveToWorldLocation(OriginalWorldLocation);
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("Janggi drag canceled in controller: Input=%s Reason=%s Piece=%s OriginalTile=(%d,%d) OriginalWorld=%s."),
+		InputType,
+		Reason,
+		*GetNameSafe(DraggedPiece.Get()),
+		OriginalTile ? OriginalTile->TileX : -1,
+		OriginalTile ? OriginalTile->TileY : -1,
+		*OriginalWorldLocation.ToCompactString());
+
+	ClearLocalDragState();
+}
+
+void AJanggiPlayerController::ClearLocalDragState()
+{
+	bIsDraggingPiece = false;
+	bIsTouchDragging = false;
+	DraggedPiece = nullptr;
+	OriginalTile = nullptr;
+	OriginalWorldLocation = FVector::ZeroVector;
 }
 
 void AJanggiPlayerController::ApplyBoardOnlyInputMode()

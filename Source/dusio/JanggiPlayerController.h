@@ -6,6 +6,8 @@
 
 class AJanggiBoard;
 class ACameraActor;
+class AJanggiPieceBase;
+class AJanggiTile;
 
 UCLASS()
 class DUSIO_API AJanggiPlayerController : public APlayerController
@@ -57,6 +59,14 @@ private:
 	UPROPERTY()
 	TObjectPtr<ACameraActor> SpawnedCamera;
 
+	UPROPERTY()
+	TObjectPtr<AJanggiPieceBase> DraggedPiece;
+
+	UPROPERTY()
+	TObjectPtr<AJanggiTile> OriginalTile;
+
+	FVector OriginalWorldLocation;
+	bool bIsDraggingPiece;
 	bool bIsTouchDragging;
 	ETouchIndex::Type ActiveTouchFinger;
 	FVector LastTouchScreenPosition;
@@ -66,8 +76,10 @@ private:
 	void HandleTouchPressed(ETouchIndex::Type FingerIndex, FVector Location);
 	void HandleTouchMoved(ETouchIndex::Type FingerIndex, FVector Location);
 	void HandleTouchReleased(ETouchIndex::Type FingerIndex, FVector Location);
-	void HandleDragStartActor(AActor* HitActor);
-	void FinishDragAtActor(AActor* HitActor);
+	bool BeginDragFromActor(AActor* HitActor, const TCHAR* InputType);
+	void FinishDragAtActor(AActor* HitActor, const TCHAR* InputType);
+	void CancelActiveDrag(const TCHAR* InputType, const TCHAR* Reason);
+	void ClearLocalDragState();
 	void ApplyBoardOnlyInputMode();
 	void ReleaseExistingPawn();
 	void SetupFixedCamera();
