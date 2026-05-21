@@ -1,23 +1,23 @@
 # Research
 
 ## 현재 구조
-- `AJanggiBoard`는 보드 상태, 합법 이동, 선택 하이라이트, 이동, 잡기, 턴 전환을 담당한다.
-- `AJanggiPlayerController`는 마우스/터치 입력, 포인터 트레이스, 드래그 미리보기, 고정 카메라, 조명 위치 보정을 담당한다.
-- `AJanggiPieceBase`는 기물 팀/타입, 외형, 스케일, 머티리얼, 보드 좌표, 잡힘 상태를 담당한다.
-- `AJanggiTile`은 보드 좌표, 점유 상태, 충돌, 하이라이트 머티리얼을 담당한다.
+- 프로젝트는 UE 5.7 C++ 런타임 모듈 `dusio`와 `L_JanggiBoard` 맵을 사용한다.
+- 기본 맵과 기본 게임모드는 `DefaultEngine.ini`에서 `L_JanggiBoard`, `JanggiGameMode`로 설정되어 있다.
+- 입력은 `AJanggiPlayerController`가 마우스/터치 드래그를 직접 처리한다.
+- Android 전용 프로젝트 설정 섹션은 아직 프로젝트 `DefaultEngine.ini`에 없다.
 
-## 확인된 동작
-- 이동 UX는 드래그 전용이다: 기물을 누르면 선택/하이라이트, 드래그 중 미리보기, 놓으면 이동/잡기 판정.
-- 타일 클릭 이동과 드롭다운 좌표 이동은 `AJanggiBoard`에서 비활성화되어 있다.
-- `CurrentTurn` 기준으로 현재 턴 기물만 선택/드래그 가능하고, 이동 성공 후 턴이 전환된다.
-- `LineTraceMultiByChannel`로 같은 포인터 선상의 기물과 타일을 함께 확인한다.
+## 확인된 모바일 관련 설정
+- `TargetedHardwareClass=Mobile`, `DefaultGraphicsPerformance=Scalable`은 이미 적용되어 있다.
+- `r.MobileHDR=True`, `r.Nanite.ProjectEnabled=True`, `r.DynamicGlobalIlluminationMethod=1`, `r.ReflectionMethod=1`, `r.RayTracing=True`, `r.PathTracing=True`가 켜져 있어 실기기 테스트 기준으로 무겁다.
+- Engine 기본 Android 값은 `MinSDKVersion=26`, `TargetSDKVersion=34`, `bBuildForArm64=true`, `Orientation=SensorLandscape`다.
+- `SetupAndroid.bat` 실행으로 Android Studio SDK, `android-34`, build-tools `35.0.1`, CMake `3.22.1`, NDK `27.2.12479018` 설치는 완료됐다.
+- UE 5.7 설치에는 Android 플랫폼 지원 핵심 파일(`DataDrivenPlatformInfo.ini`, `SDK.json`, Android UBT 파일)이 빠져 있어 Android 타깃 빌드는 아직 불가하다.
 
-## 이번 정리 결과
-- `AJanggiPlayerController`가 `bIsDraggingPiece`, `DraggedPiece`, `OriginalTile`, `OriginalWorldLocation`을 명시적으로 보관한다.
-- 터치 입력은 유효한 기물 드래그가 시작된 경우에만 터치 드래그 상태로 들어간다.
-- 타일 press는 이동으로 처리하지 않고 로그만 남긴다.
-- 이동 실패, 같은 팀 기물, 빈 공간 release는 원위치 복귀와 하이라이트 정리를 수행한다.
+## 리스크
+- Epic Games Launcher에서 UE 5.7 Android optional component 설치가 필요하다.
+- USB 드라이버, 개발자 옵션, 실기기 연결은 로컬 환경 문제라 코드에서 보장할 수 없다.
+- 실제 화면 잘림 여부는 실기기 해상도와 노치/시스템 UI에 따라 패키징 후 확인해야 한다.
 
 ## 제약
-- 실제 장기 이동 규칙, 기물 색상, 바닥 정렬, 스케일, 카메라 값은 변경하지 않았다.
-- AI, 온라인, 광고, 모델 교체, 애니메이션, FX는 이번 범위가 아니다.
+- 이번 단계는 Android 실기기 테스트 준비다.
+- 드래그 이동 규칙, 턴 전환, 기물 배치, 카메라 게임플레이 값은 변경하지 않는다.
