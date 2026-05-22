@@ -39,6 +39,8 @@ AJanggiPlayerController::AJanggiPlayerController()
 	CameraPlanarDistanceScale = 0.792f;
 	CameraHeightScale = 0.95f;
 	CameraDistanceMultiplier = 1.45475f;
+	PortraitCameraMinAspect = 0.5f;
+	PortraitCameraMaxDistanceScale = 1.55f;
 	DirectionalLightOffsetTilesX = -2.0f;
 	CachedBoard = nullptr;
 	SpawnedCamera = nullptr;
@@ -388,7 +390,26 @@ void AJanggiPlayerController::SetupFixedCamera()
 
 	const FVector OriginalCameraOffset(0.0f, -PlanarDistance, Height);
 	const float PreviousCameraDistance = (OriginalCameraOffset * PreviousCameraDistanceMultiplier).Size();
-	const FVector AdjustedCameraOffset = OriginalCameraOffset * CameraDistanceMultiplier;
+	int32 ViewportWidth = 0;
+	int32 ViewportHeight = 0;
+	GetViewportSize(ViewportWidth, ViewportHeight);
+
+	float AspectRatio = 0.0f;
+	float PortraitDistanceScale = 1.0f;
+	if (ViewportWidth > 0 && ViewportHeight > 0)
+	{
+		AspectRatio = static_cast<float>(ViewportWidth) / static_cast<float>(ViewportHeight);
+		if (AspectRatio < 1.0f)
+		{
+			const float SafeMinAspect = FMath::Max(PortraitCameraMinAspect, KINDA_SMALL_NUMBER);
+			const float ClampedAspect = FMath::Clamp(AspectRatio, SafeMinAspect, 1.0f);
+			const float NormalizedPortraitAmount = (1.0f - ClampedAspect) / (1.0f - SafeMinAspect);
+			PortraitDistanceScale = FMath::Lerp(1.0f, PortraitCameraMaxDistanceScale, NormalizedPortraitAmount);
+		}
+	}
+
+	const float FinalCameraDistanceMultiplier = CameraDistanceMultiplier * PortraitDistanceScale;
+	const FVector AdjustedCameraOffset = OriginalCameraOffset * FinalCameraDistanceMultiplier;
 	const float AdjustedCameraDistance = AdjustedCameraOffset.Size();
 	const FVector CameraLocation = BoardCenter + AdjustedCameraOffset;
 	FRotator CameraRotation = (BoardCenter - CameraLocation).Rotation();
@@ -409,7 +430,7 @@ void AJanggiPlayerController::SetupFixedCamera()
 
 	bAutoManageActiveCameraTarget = false;
 	SetViewTargetWithBlend(SpawnedCamera, CameraBlendTime);
-	UE_LOG(LogTemp, Log, TEXT("Janggi fixed camera set: Location=%s Rotation=%s FOV=%.1f PreviousDistance=%.1f AdjustedDistance=%.1f PreviousMultiplier=%.2f Multiplier=%.3f PlanarDistance=%.1f Height=%.1f."),
+	UE_LOG(LogTemp, Log, TEXT("Janggi fixed camera set: Location=%s Rotation=%s FOV=%.1f PreviousDistance=%.1f AdjustedDistance=%.1f PreviousMultiplier=%.2f BaseMultiplier=%.3f PortraitScale=%.3f FinalMultiplier=%.3f Viewport=%dx%d Aspect=%.3f PlanarDistance=%.1f Height=%.1f."),
 		*CameraLocation.ToCompactString(),
 		*CameraRotation.ToCompactString(),
 		CameraFieldOfView,
@@ -417,6 +438,11 @@ void AJanggiPlayerController::SetupFixedCamera()
 		AdjustedCameraDistance,
 		PreviousCameraDistanceMultiplier,
 		CameraDistanceMultiplier,
+		PortraitDistanceScale,
+		FinalCameraDistanceMultiplier,
+		ViewportWidth,
+		ViewportHeight,
+		AspectRatio,
 		PlanarDistance,
 		Height);
 }

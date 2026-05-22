@@ -41,6 +41,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Janggi|Camera", meta = (ClampMin = "1.0"))
 	float CameraDistanceMultiplier;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Janggi|Camera", meta = (ClampMin = "0.1", ClampMax = "1.0"))
+	float PortraitCameraMinAspect;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Janggi|Camera", meta = (ClampMin = "1.0"))
+	float PortraitCameraMaxDistanceScale;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Janggi|Lighting")
 	float DirectionalLightOffsetTilesX;
 

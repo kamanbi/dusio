@@ -1,19 +1,22 @@
 # Research
 
 ## 현재 구조
-- 프로젝트는 UE 5.7 C++ 런타임 모듈 `dusio`와 `L_JanggiBoard` 맵을 사용한다.
-- Android SDK/NDK 설치와 UE Android 플랫폼 인식은 완료되어 Android APK 빌드가 가능하다.
-- `AJanggiPlayerController`는 PC/모바일 드래그 입력을 직접 처리한다.
+- Android Development 패키징과 실기기 배포는 `RunUAT BuildCookRun`으로 성공한다.
+- Android 앱 방향은 `Orientation=Portrait`로 세로 고정되어 있다.
+- 고정 카메라는 `AJanggiPlayerController::SetupFixedCamera()`에서 보드 크기, 뷰포트 비율, 배율로 위치를 계산한다.
+- 드래그 입력은 `AJanggiPlayerController`의 마우스/터치 공통 흐름을 사용한다.
 
-## 확인된 문제
-- 휴대폰 실행 시 `Failed to open descriptor file ../../../dusio/dusio.uproject`가 표시된다.
-- 직전 설치 APK는 UBT Android 타깃 빌드 산출물이라 게임 content cook/stage/package 흐름을 완전히 거치지 않았다.
-- 현재 Android 설정은 `bPackageDataInsideApk=False`라 실기기 단독 APK 설치 테스트에서 descriptor/content 누락 문제가 생기기 쉽다.
+## 확인된 요구
+- Android 화면 방향을 세로 고정으로 유지한다.
+- 세로 화면은 가로폭이 좁아 기존 카메라 거리로는 장기판 좌우/상하가 잘릴 수 있다.
+- 카메라는 보드 중심을 바라보는 기존 사선뷰를 유지하되, 뷰포트 비율을 보고 거리만 보정한다.
 
-## 판단
-- 실기기 Development 테스트는 `RunUAT BuildCookRun`으로 cook, stage, pak, package, deploy까지 수행해야 한다.
-- 초기 실기기 테스트 편의상 `bPackageDataInsideApk=True`로 바꿔 APK 단독 설치에 필요한 데이터를 포함한다.
-- `Build/` 폴더는 Android 패키징 중 생성되는 산출물이므로 Git 추적 대상에서 제외한다.
+## 검증 결과
+- Win64 Editor/Game 빌드가 성공했다.
+- Android `BuildCookRun` cook, package, deploy가 성공했다.
+- 실기기에서 `requestedOrientation=SCREEN_ORIENTATION_PORTRAIT`가 확인됐다.
+- FOV, 기물 크기, 이동 규칙, 턴 로직은 변경하지 않았다.
 
 ## 제약
-- 드래그 이동 규칙, 턴 전환, 기물 배치, 카메라 게임플레이 값은 변경하지 않는다.
+- 세로 화면에서는 장기판 전체를 보이게 하는 것이 우선이고, 기물이 가로 화면보다 작아질 수 있다.
+- 실제 터치 오프셋과 화면 잘림은 패키징 후 실기기에서 확인해야 한다.
