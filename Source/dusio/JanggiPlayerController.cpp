@@ -110,7 +110,7 @@ void AJanggiPlayerController::AddRollInput(float Val)
 void AJanggiPlayerController::HandlePrimaryPressed()
 {
 	AActor* HitActor = nullptr;
-	if (!TraceActorUnderCursor(HitActor))
+	if (!TraceActorUnderCursor(HitActor, false))
 	{
 		return;
 	}
@@ -126,7 +126,7 @@ void AJanggiPlayerController::HandlePrimaryReleased()
 	}
 
 	AActor* HitActor = nullptr;
-	if (!TraceActorUnderCursor(HitActor))
+	if (!TraceActorUnderCursor(HitActor, true))
 	{
 		CancelActiveDrag(TEXT("Mouse"), TEXT("NoHitOnRelease"));
 		return;
@@ -138,7 +138,7 @@ void AJanggiPlayerController::HandlePrimaryReleased()
 void AJanggiPlayerController::HandleTouchPressed(ETouchIndex::Type FingerIndex, FVector Location)
 {
 	AActor* HitActor = nullptr;
-	if (!TraceActorAtScreenPosition(Location.X, Location.Y, HitActor))
+	if (!TraceActorAtScreenPosition(Location.X, Location.Y, HitActor, false))
 	{
 		return;
 	}
@@ -178,7 +178,7 @@ void AJanggiPlayerController::HandleTouchReleased(ETouchIndex::Type FingerIndex,
 	}
 
 	AActor* HitActor = nullptr;
-	if (!TraceActorAtScreenPosition(Location.X, Location.Y, HitActor))
+	if (!TraceActorAtScreenPosition(Location.X, Location.Y, HitActor, true))
 	{
 		CancelActiveDrag(TEXT("Touch"), TEXT("NoHitOnRelease"));
 		return;
@@ -241,6 +241,16 @@ bool AJanggiPlayerController::BeginDragFromActor(AActor* HitActor, const TCHAR* 
 
 	if (AJanggiTile* Tile = Cast<AJanggiTile>(HitActor))
 	{
+		if (AJanggiPieceBase* TilePiece = Tile->CurrentPiece.Get())
+		{
+			UE_LOG(LogTemp, Log, TEXT("Janggi drag start redirected: Input=%s Tile=(%d,%d) Occupant=%s."),
+				InputType,
+				Tile->TileX,
+				Tile->TileY,
+				*GetNameSafe(TilePiece));
+			return BeginDragFromActor(TilePiece, InputType);
+		}
+
 		UE_LOG(LogTemp, Log, TEXT("Janggi drag start ignored: Input=%s Actor=%s Type=Tile Tile=(%d,%d) Reason=DragRequiresPiecePress."),
 			InputType,
 			*GetNameSafe(Tile),
@@ -537,7 +547,7 @@ void AJanggiPlayerController::UpdateDragPreviewAtScreenPosition(float ScreenX, f
 	Board->PreviewDraggedPieceAtWorld(RayOrigin + RayDirection * Distance);
 }
 
-bool AJanggiPlayerController::TraceActorUnderCursor(AActor*& HitActor)
+bool AJanggiPlayerController::TraceActorUnderCursor(AActor*& HitActor, bool bPreferDragTarget)
 {
 	float MouseX = 0.0f;
 	float MouseY = 0.0f;
@@ -547,10 +557,10 @@ bool AJanggiPlayerController::TraceActorUnderCursor(AActor*& HitActor)
 		return false;
 	}
 
-	return TraceActorAtScreenPosition(MouseX, MouseY, HitActor);
+	return TraceActorAtScreenPosition(MouseX, MouseY, HitActor, bPreferDragTarget);
 }
 
-bool AJanggiPlayerController::TraceActorAtScreenPosition(float ScreenX, float ScreenY, AActor*& HitActor)
+bool AJanggiPlayerController::TraceActorAtScreenPosition(float ScreenX, float ScreenY, AActor*& HitActor, bool bPreferDragTarget)
 {
 	HitActor = nullptr;
 
@@ -586,12 +596,13 @@ bool AJanggiPlayerController::TraceActorAtScreenPosition(float ScreenX, float Sc
 		return false;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("Janggi trace multi: Screen=(%.1f,%.1f) HitCount=%d Selected=%s SelectedPiece=%s."),
+	UE_LOG(LogTemp, Log, TEXT("Janggi trace multi: Screen=(%.1f,%.1f) HitCount=%d Selected=%s SelectedPiece=%s PreferDragTarget=%s."),
 		ScreenX,
 		ScreenY,
 		HitResults.Num(),
 		Board && Board->SelectedPiece ? TEXT("true") : TEXT("false"),
-		Board && Board->SelectedPiece ? *GetNameSafe(Board->SelectedPiece.Get()) : TEXT("None"));
+		Board && Board->SelectedPiece ? *GetNameSafe(Board->SelectedPiece.Get()) : TEXT("None"),
+		bPreferDragTarget ? TEXT("true") : TEXT("false"));
 
 	for (const FHitResult& HitResult : HitResults)
 	{
@@ -603,7 +614,7 @@ bool AJanggiPlayerController::TraceActorAtScreenPosition(float ScreenX, float Sc
 			HitResult.bBlockingHit ? TEXT("true") : TEXT("false"));
 	}
 
-	HitActor = SelectTraceTarget(HitResults, Board);
+	HitActor = SelectTraceTarget(HitResults, Board, bPreferDragTarget);
 	UE_LOG(LogTemp, Log, TEXT("Janggi trace selected target: Actor=%s Type=%s."),
 		*GetNameSafe(HitActor),
 		GetTraceActorType(HitActor));
@@ -611,7 +622,7 @@ bool AJanggiPlayerController::TraceActorAtScreenPosition(float ScreenX, float Sc
 	return HitActor != nullptr;
 }
 
-AActor* AJanggiPlayerController::SelectTraceTarget(const TArray<FHitResult>& HitResults, AJanggiBoard* Board) const
+AActor* AJanggiPlayerController::SelectTraceTarget(const TArray<FHitResult>& HitResults, AJanggiBoard* Board, bool bPreferDragTarget) const
 {
 	AJanggiPieceBase* FirstPiece = nullptr;
 	AJanggiPieceBase* FirstOwnPiece = nullptr;
@@ -685,6 +696,21 @@ AActor* AJanggiPlayerController::SelectTraceTarget(const TArray<FHitResult>& Hit
 
 	if (bHasSelectedPiece)
 	{
+		if (bPreferDragTarget && FirstLegalTile)
+		{
+			return FirstLegalTile;
+		}
+
+		if (!bPreferDragTarget && FirstOwnPiece)
+		{
+			return FirstOwnPiece;
+		}
+
+		if (FirstEnemyPiece)
+		{
+			return FirstEnemyPiece;
+		}
+
 		if (FirstOwnPiece)
 		{
 			return FirstOwnPiece;
@@ -693,11 +719,6 @@ AActor* AJanggiPlayerController::SelectTraceTarget(const TArray<FHitResult>& Hit
 		if (FirstLegalTile)
 		{
 			return FirstLegalTile;
-		}
-
-		if (FirstEnemyPiece)
-		{
-			return FirstEnemyPiece;
 		}
 
 		if (FirstTile)

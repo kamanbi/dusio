@@ -92,9 +92,9 @@ private:
 	void ApplyDirectionalLightOffset();
 	void UpdateMouseDragPreview();
 	void UpdateDragPreviewAtScreenPosition(float ScreenX, float ScreenY);
-	bool TraceActorUnderCursor(AActor*& HitActor);
-	bool TraceActorAtScreenPosition(float ScreenX, float ScreenY, AActor*& HitActor);
-	AActor* SelectTraceTarget(const TArray<FHitResult>& HitResults, AJanggiBoard* Board) const;
+	bool TraceActorUnderCursor(AActor*& HitActor, bool bPreferDragTarget);
+	bool TraceActorAtScreenPosition(float ScreenX, float ScreenY, AActor*& HitActor, bool bPreferDragTarget);
+	AActor* SelectTraceTarget(const TArray<FHitResult>& HitResults, AJanggiBoard* Board, bool bPreferDragTarget) const;
 	const TCHAR* GetTraceActorType(AActor* Actor) const;
 	AJanggiBoard* FindJanggiBoard();
 };

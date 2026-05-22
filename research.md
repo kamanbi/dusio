@@ -2,21 +2,28 @@
 
 ## 현재 구조
 - Android Development 패키징과 실기기 배포는 `RunUAT BuildCookRun`으로 성공한다.
-- Android 앱 방향은 `Orientation=Portrait`로 세로 고정되어 있다.
-- 고정 카메라는 `AJanggiPlayerController::SetupFixedCamera()`에서 보드 크기, 뷰포트 비율, 배율로 위치를 계산한다.
-- 드래그 입력은 `AJanggiPlayerController`의 마우스/터치 공통 흐름을 사용한다.
+- 최근 세로 고정으로 바꿨지만, 장기판과 기물이 너무 작아져 플레이성이 떨어진다.
+- 드래그 입력은 `AJanggiPlayerController`가 `LineTraceMultiByChannel` 결과를 해석해 처리한다.
+- 기물 Mesh가 작거나 터치 위치가 조금 벗어나면 기물 대신 점유 타일이 맞을 수 있다.
 
-## 확인된 요구
-- Android 화면 방향을 세로 고정으로 유지한다.
-- 세로 화면은 가로폭이 좁아 기존 카메라 거리로는 장기판 좌우/상하가 잘릴 수 있다.
-- 카메라는 보드 중심을 바라보는 기존 사선뷰를 유지하되, 뷰포트 비율을 보고 거리만 보정한다.
+## 확인된 문제
+- Android는 다시 가로 고정이 필요하다.
+- 터치 드래그가 되는 칸과 안 되는 칸이 섞여 있다.
+- 현재 드래그 시작은 `Piece` hit만 허용하고, `Tile` hit는 무시한다.
+- 현재 드래그 종료 trace는 선택 기물이 있을 때 같은 팀 기물을 먼저 반환할 수 있어, 뒤쪽 타일 판정을 방해할 수 있다.
+
+## 판단
+- `Orientation=Landscape`로 되돌린다.
+- 드래그 시작 시 점유 타일이 hit되면 그 타일의 `CurrentPiece`로 드래그를 시작한다.
+- 드래그 종료 trace는 합법 목적지 타일을 같은 팀 기물보다 우선한다.
+- 카메라, 이동 규칙, 턴 로직은 유지한다.
 
 ## 검증 결과
-- Win64 Editor/Game 빌드가 성공했다.
-- Android `BuildCookRun` cook, package, deploy가 성공했다.
-- 실기기에서 `requestedOrientation=SCREEN_ORIENTATION_PORTRAIT`가 확인됐다.
-- FOV, 기물 크기, 이동 규칙, 턴 로직은 변경하지 않았다.
+- `dusioEditor Win64 Development` 빌드는 성공했다.
+- Android `BuildCookRun` 패키징과 실기기 배포가 성공했다.
+- 실기기에서 `SCREEN_ORIENTATION_LANDSCAPE`로 실행되는 것을 확인했다.
+- 로그에서 점유 타일 터치가 해당 기물 드래그 시작으로 전환되는 것을 확인했다.
 
 ## 제약
-- 세로 화면에서는 장기판 전체를 보이게 하는 것이 우선이고, 기물이 가로 화면보다 작아질 수 있다.
-- 실제 터치 오프셋과 화면 잘림은 패키징 후 실기기에서 확인해야 한다.
+- 이동 방식은 계속 드래그 전용이다.
+- 실제 장기 규칙과 기물 배치에는 손대지 않는다.
