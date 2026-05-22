@@ -1,26 +1,23 @@
 # Plan
 
 ## 목표
-Android 실기기 Development 빌드를 시도할 수 있는 기본 프로젝트 설정을 준비한다.
+Android 실기기에서 descriptor 누락 오류 없이 실행되는 Development 패키지를 만든다.
 
 ## 구현 순서
-1. `DefaultEngine.ini`에서 모바일 실기기 테스트에 무거운 렌더링 기능을 끈다.
-2. 프로젝트 Android 런타임 설정 섹션을 추가해 패키지명, 가로 고정, Arm64, SDK 기본값을 명시한다.
-3. `DefaultGame.ini`의 템플릿 프로젝트 이름을 `dusio`로 정리한다.
-4. UnrealBuildTool로 Win64 타깃을 빌드해 설정 변경으로 인한 기본 컴파일 문제를 확인한다.
-5. `SetupAndroid.bat`로 SDK/NDK 기본 설치를 확인한다.
-6. UE 5.7 Android optional component가 없으면 사용자가 Launcher에서 설치할 항목을 정리한다.
+1. `DefaultEngine.ini`에서 `bPackageDataInsideApk=True`로 변경한다.
+2. `.gitignore`에 Android 패키징 산출물 `Build/`를 추가한다.
+3. `RunUAT BuildCookRun`으로 Android cook, stage, pak, package, deploy를 실행한다.
+4. 실기기에서 앱 실행 상태와 로그를 확인한다.
+5. 성공한 설정 변경을 커밋/푸시한다.
 
 ## 가독성 5칙
-- Early Return: 코드 변경은 없으므로 입력 로직에는 영향이 없다.
-- Contextual Naming: Android 설정은 엔진 표준 섹션명과 키를 그대로 사용한다.
-- Magic Number Hunter: SDK 26/34는 UE 5.7 기본값 기준으로 명시한다.
-- Parameter Object: 설정 파일 변경만 수행하므로 해당 없음.
-- Complexity Check: 설정 가독성 목표는 8/10이며, Android 관련 값을 한 섹션에 모은다.
+- Early Return: 코드 변경 없음.
+- Contextual Naming: 엔진 표준 Android 설정 키를 그대로 사용한다.
+- Magic Number Hunter: 새 숫자 상수 추가 없음.
+- Parameter Object: 설정 변경만 수행하므로 해당 없음.
+- Complexity Check: 패키징 흐름을 UBT 단독 빌드에서 UAT 패키징으로 분리해 운영 명확도를 8/10으로 유지한다.
 
 ## 완료 기준
-- Android 패키지명과 가로 방향 설정이 프로젝트 설정에 기록된다.
-- Mobile HDR, Lumen 계열, Nanite, RayTracing/PathTracing이 실기기 테스트 기준으로 꺼진다.
-- Win64 Editor/Game 빌드가 성공한다.
-- Android SDK/NDK 설치 상태와 UE Android 플랫폼 지원 설치 여부가 구분된다.
-- 에디터에서 사용자가 확인할 Android 빌드 체크리스트가 준비된다.
+- APK 설치 후 `Failed to open descriptor file` 오류가 재현되지 않는다.
+- 앱이 `GameActivity`로 실행되고 장기판 확인 단계로 진입한다.
+- Git에는 소스/설정만 남고 Android 생성 산출물은 제외된다.
